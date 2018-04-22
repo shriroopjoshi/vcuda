@@ -4,9 +4,20 @@
 #include "include/rapidjson/document.h"
 #include "include/rapidjson/writer.h"
 #include "include/rapidjson/stringbuffer.h"
+
+
 #include <unordered_map>
+#include <cstdlib>
+#include <unistd.h>
+#include <string>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
 
 using namespace rapidjson;
+
+#define BUFFER_SIZE 1024
 
 typedef int label_t;
 
@@ -25,12 +36,15 @@ struct vcuda_var {
 
 class vcuda_client {
     Document cuda_document;
+    std :: string host;
+    int port;
     std :: unordered_map<label_t, vcuda_var> inputs;
-    void print_document();
+    std :: string print_document();
 public:
-    vcuda_client();
+    vcuda_client(std :: string, int);
     label_t vcudaMalloc(int, vcuda_type);
     void vcudaMemcpy(label_t, void *, int,  vcuda_memcpy);
+    void execute();
 };
 
 #endif

@@ -1,9 +1,11 @@
 #include <iostream>
 #include "vcuda_client.hpp"
 
-vcuda_client client;
+vcuda_client client ("localhost", 9000);
 
 int main() {
+    // std :: cout << sizeof(int) << std :: endl;
+    // return 0;
     label_t c1 = client.vcudaMalloc(3, VC_INT);
     std :: cout << "c = " << c1 << std :: endl;
     label_t c2 = client.vcudaMalloc(5, VC_FLOAT);
@@ -12,5 +14,6 @@ int main() {
     client.vcudaMemcpy(c1, arr, 3, vcudaMemcpyDeviceToHost);
     float ptr[] = {2.5, 7.9, 6.3, 9.45, 8.2385};
     client.vcudaMemcpy(c2, ptr, 5, vcudaMemcpyDeviceToHost);
+    client.execute();
     return 0;
 }
