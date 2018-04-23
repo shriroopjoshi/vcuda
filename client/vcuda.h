@@ -1,5 +1,5 @@
-#ifndef VCUDA_CLIENT_H_
-#define VCUDA_CLIENT_H_
+#ifndef VCUDA_H_
+#define VCUDA_H_
 
 #include "include/rapidjson/document.h"
 #include "include/rapidjson/writer.h"

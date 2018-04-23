@@ -1,4 +1,4 @@
-#include "vcuda_client.hpp"
+#include "vcuda.h"
 #include <iostream>
 
 using namespace rapidjson;
@@ -8,7 +8,6 @@ vcuda_client :: vcuda_client(std :: string host, int port) {
     this -> port = port;
     const char *init_str = "{\"vars\": [], \"result\": {}, \"kernel\": {}}";
     cuda_document.Parse(init_str);
-    print_document();
 }
 
 label_t vcuda_client :: vcudaMalloc(int n, vcuda_type type) {
