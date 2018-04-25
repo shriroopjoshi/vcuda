@@ -4,10 +4,10 @@ INCLUDE = -I../
 LDPATH = -L../
 LIBS = -lvcuda
 
-all: clean example
+all: clean example.out
 
-example: example.cpp
+example.out: example.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) $< -o $@ $(LDPATH) $(LIBS)
 
 clean:
-	rm -f example
+	rm -f *.out
