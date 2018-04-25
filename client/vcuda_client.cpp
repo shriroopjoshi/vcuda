@@ -6,7 +6,7 @@ using namespace rapidjson;
 vcuda_client :: vcuda_client(std :: string host, int port) {
     this -> host = host;
     this -> port = port;
-    const char *init_str = "{\"vars\": [], \"result\": {}, \"kernel\": {}}";
+    const char *init_str = "{\"vars\": [], \"result\": {}, \"kernel\": []}";
     cuda_document.Parse(init_str);
 }
 
@@ -45,7 +45,37 @@ void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memc
     print_document();
 }
 
-void vcuda_client :: execute() {
+label_t vcuda_client :: add_kernel(std :: string path) {
+    label_t label = (label_t) kernels.size() + 1;
+    std :: ifstream in(path.c_str(), std :: ios :: in | std :: ios :: binary);
+    std :: string kernel_str;
+    if(in) {
+        in.seekg(0, std::ios::end);
+        kernel_str.resize(in.tellg());
+        in.seekg(0, std::ios::beg);
+        in.read(&kernel_str[0], kernel_str.size());
+        in.close();
+    } else {
+        throw (errno);
+    }
+    Document :: AllocatorType& allocator = cuda_document.GetAllocator();
+    Value& doc_kernels = cuda_document["kernel"];
+    Value v (kObjectType);
+    v.AddMember("blocks", 1, allocator);
+    v.AddMember("threads", 1, allocator);
+    Value kernel_val;
+    char *kr_str = new char[kernel_str.length() + 1];
+    strcpy(kr_str, kernel_str.c_str());
+    kernel_val.SetString(kr_str, kernel_str.length() + 1, allocator);
+    v.AddMember("code", kernel_val, allocator);
+    doc_kernels.PushBack(v, allocator);
+    std :: pair <label_t, std :: string> p (label, path);
+    kernels.insert(p);
+    delete[] kr_str;
+    return label;
+}
+
+void vcuda_client :: execute_kernel(label_t kernel_label) {
     int sockfd, n;
     sockaddr_in serv_addr;
     hostent *server;

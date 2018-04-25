@@ -9,6 +9,9 @@
 #include <unordered_map>
 #include <cstdlib>
 #include <unistd.h>
+#include <fstream>
+#include <streambuf>
+#include <cerrno>
 #include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -29,6 +32,10 @@ enum vcuda_memcpy {
     vcudaMemcpyHostToDevice, vcudaMemcpyDeviceToHost
 };
 
+struct vcuda_dim3 {
+    int x, y, z;
+};
+
 struct vcuda_var {
     int size;
     vcuda_type type;
@@ -39,12 +46,15 @@ class vcuda_client {
     std :: string host;
     int port;
     std :: unordered_map<label_t, vcuda_var> inputs;
+    std :: unordered_map<label_t, std :: string> kernels;
     std :: string print_document();
 public:
     vcuda_client(std :: string, int);
+    label_t add_kernel(std :: string);
+    void set_kernel_parameters(label_t, vcuda_dim3, vcuda_dim3);
     label_t vcudaMalloc(int, vcuda_type);
     void vcudaMemcpy(label_t, void *, int,  vcuda_memcpy);
-    void execute();
+    void execute_kernel(label_t);
 };
 
 #endif
