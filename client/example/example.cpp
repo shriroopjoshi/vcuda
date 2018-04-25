@@ -11,7 +11,7 @@ int main() {
     client.vcudaMemcpy(c1, arr, 3, vcudaMemcpyDeviceToHost);
     float ptr[] = {2.5, 7.9, 6.3, 9.45, 8.2385};
     client.vcudaMemcpy(c2, ptr, 5, vcudaMemcpyDeviceToHost);
-    label_t k1 = client.add_kernel("example.kr");
+    label_t k1 = client.add_kernel("example.kr", "example");
     client.execute_kernel(k1);
     return 0;
 }

@@ -14,7 +14,9 @@
 class vcuda_io {
     sockaddr_in serv_addr;
     int sockfd;
+    bool connected;
 public:
+    vcuda_io();
     void init(std :: string, int);
     int connect_server();
     int send(std :: string);

@@ -1,5 +1,9 @@
 #include "vcuda_io.h"
 
+vcuda_io :: vcuda_io() {
+    connected = false;
+}
+
 void vcuda_io :: init(std :: string host, int port) {
     hostent *server;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -19,12 +23,15 @@ void vcuda_io :: init(std :: string host, int port) {
 }
 
 int vcuda_io :: connect_server() {
+    if(connected)
+        return 0;
     if(sockfd == -1 || sockfd == -2) {
         return sockfd;
     }
     if(connect(sockfd, (sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         return -4;
     } else {
+        connected = true;
         return 0;
     }
 }
@@ -64,5 +71,8 @@ std :: string vcuda_io :: read_kernel(std :: string filename) {
 }
 
 void vcuda_io :: disconnect() {
-    close(sockfd);
+    if(connected) {
+        close(sockfd);
+        connected = false;
+    }
 }

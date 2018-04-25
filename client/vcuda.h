@@ -47,10 +47,11 @@ class vcuda_client {
     vcuda_io io;
     std :: unordered_map<label_t, vcuda_var> inputs;
     std :: unordered_map<label_t, std :: string> kernels;
-    std :: string print_document();
+    std :: string print_document(Document &);
+    void err_exit(int);
 public:
     vcuda_client(std :: string, int);
-    label_t add_kernel(std :: string);
+    label_t add_kernel(std :: string, std :: string);
     void set_kernel_parameters(label_t, vcuda_dim3, vcuda_dim3);
     label_t vcudaMalloc(int, vcuda_type);
     void vcudaMemcpy(label_t, void *, int,  vcuda_memcpy);

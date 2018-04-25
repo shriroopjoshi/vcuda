@@ -4,7 +4,7 @@ using namespace rapidjson;
 
 vcuda_client :: vcuda_client(std :: string host, int port) {
     io.init(host, port);
-    const char *init_str = "{\"vars\": [], \"result\": {}, \"kernel\": []}";
+    const char *init_str = "{\"vars\": []}";
     cuda_document.Parse(init_str);
 }
 
@@ -40,44 +40,65 @@ void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memc
         v.AddMember("data", a, allocator);
     }
     doc_vars.PushBack(v, allocator);
-    print_document();
 }
 
-label_t vcuda_client :: add_kernel(std :: string path) {
+label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     label_t label = (label_t) kernels.size() + 1;
     std :: string kernel_str;
     kernel_str = io.read_kernel(path);
-    Document :: AllocatorType& allocator = cuda_document.GetAllocator();
-    Value& doc_kernels = cuda_document["kernel"];
-    Value v (kObjectType);
-    v.AddMember("blocks", 1, allocator);
-    v.AddMember("threads", 1, allocator);
-    Value kernel_val;
     char *kr_str = new char[kernel_str.length() + 1];
     strcpy(kr_str, kernel_str.c_str());
-    kernel_val.SetString(kr_str, kernel_str.length() + 1, allocator);
+    Document kdoc;
+    kdoc.Parse("{}");
+    Document :: AllocatorType& allocator = kdoc.GetAllocator();
+    Value kernel_val;
+    kernel_val.SetString(kr_str, kernel_str.length(), allocator);
+    name.append(".kr");
+    char *nameb = new char[name.length() + 1];
+    strcpy(nameb, name.c_str());
+    Value name_value;
+    name_value.SetString(nameb, name.length(), allocator);
+    Value v (kObjectType);
+    v.AddMember("name", name_value, allocator);
+    v.AddMember("blocks", 1, allocator);
+    v.AddMember("threads", 1, allocator);
     v.AddMember("code", kernel_val, allocator);
-    doc_kernels.PushBack(v, allocator);
+    kdoc.AddMember("kernel", v, allocator);
     std :: pair <label_t, std :: string> p (label, path);
     kernels.insert(p);
+    err_exit(io.connect_server());
+    io.send(print_document(kdoc));
+    // io.send(b.GetString());
     delete[] kr_str;
     return label;
 }
 
 void vcuda_client :: execute_kernel(label_t kernel_label) {
-    int t = io.connect_server();
-    if(t < 0) {
-        std :: cerr << "Server error" << std :: endl;
-        exit(1);
-    }
-    io.send(print_document());
+    err_exit(io.connect_server());
+    // io.send(print_document(cuda_document));
     io.disconnect();
 }
 
-std :: string vcuda_client :: print_document() {
+std :: string vcuda_client :: print_document(Document &d) {
     StringBuffer buffer;
     Writer<StringBuffer> writer(buffer);
-    cuda_document.Accept(writer);
+    d.Accept(writer);
     // std :: cout << buffer.GetString() << std :: endl;
     return buffer.GetString();
+}
+
+void vcuda_client :: err_exit(int status) {
+    if(status >= 0) {
+        return;
+    }
+    if(status == -1) {
+        std :: cerr << "Unable to open a connection to server" << std :: endl;
+    }
+    if(status == -2) {
+        std :: cerr << "Unable to find server" << std :: endl;
+    }
+    if(status == -4) {
+        std :: cerr << "Unable to connect to server" << std :: endl;
+    }
+    exit(status * -1);
 }
