@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -std=c++11
-SRC = vcuda_client.cpp
+SRC = vcuda_client.cpp vcuda_io.cpp
 INCLUDE = -I../include/
 OBJ = $(SRC:.cpp = .o)
 LIBNAME = libvcuda.a

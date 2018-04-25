@@ -1,11 +1,9 @@
 #include "vcuda.h"
-#include <iostream>
 
 using namespace rapidjson;
 
 vcuda_client :: vcuda_client(std :: string host, int port) {
-    this -> host = host;
-    this -> port = port;
+    io.init(host, port);
     const char *init_str = "{\"vars\": [], \"result\": {}, \"kernel\": []}";
     cuda_document.Parse(init_str);
 }
@@ -47,17 +45,8 @@ void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memc
 
 label_t vcuda_client :: add_kernel(std :: string path) {
     label_t label = (label_t) kernels.size() + 1;
-    std :: ifstream in(path.c_str(), std :: ios :: in | std :: ios :: binary);
     std :: string kernel_str;
-    if(in) {
-        in.seekg(0, std::ios::end);
-        kernel_str.resize(in.tellg());
-        in.seekg(0, std::ios::beg);
-        in.read(&kernel_str[0], kernel_str.size());
-        in.close();
-    } else {
-        throw (errno);
-    }
+    kernel_str = io.read_kernel(path);
     Document :: AllocatorType& allocator = cuda_document.GetAllocator();
     Value& doc_kernels = cuda_document["kernel"];
     Value v (kObjectType);
@@ -76,45 +65,13 @@ label_t vcuda_client :: add_kernel(std :: string path) {
 }
 
 void vcuda_client :: execute_kernel(label_t kernel_label) {
-    int sockfd, n;
-    sockaddr_in serv_addr;
-    hostent *server;
-
-    char buffer[BUFFER_SIZE];
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd < 0) {
-        std :: cerr << "Unable to open socket" << std :: endl;
-        return;
+    int t = io.connect_server();
+    if(t < 0) {
+        std :: cerr << "Server error" << std :: endl;
+        exit(1);
     }
-    server = gethostbyname(host.c_str());
-    if(server == NULL) {
-        std :: cerr << "No such server" << std :: endl;
-        return;
-    }
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *) server -> h_addr, (char *) &serv_addr.sin_addr.s_addr, server -> h_length);
-    serv_addr.sin_port = htons(port);
-    if(connect(sockfd, (sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        std :: cerr << "Error connecting" << std :: endl;
-        return;
-    }
-    bzero(buffer, BUFFER_SIZE);
-    std :: string json = print_document();
-    size_t size = json.size();
-    std :: string substring;
-    int i = 0;
-    while(size > BUFFER_SIZE) {
-        substring = json.substr(i * BUFFER_SIZE, (i + 1) * BUFFER_SIZE - 1);
-        strcpy(buffer, substring.c_str());
-        n = write(sockfd, buffer, BUFFER_SIZE);
-        size = size - BUFFER_SIZE;
-        i += 1;
-    }
-    substring = json.substr(i * BUFFER_SIZE, size).c_str();
-    strcpy(buffer, substring.c_str());
-    n = write(sockfd, buffer, strlen(buffer));
-    close(sockfd);
+    io.send(print_document());
+    io.disconnect();
 }
 
 std :: string vcuda_client :: print_document() {

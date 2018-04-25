@@ -4,8 +4,9 @@
 #include "include/rapidjson/document.h"
 #include "include/rapidjson/writer.h"
 #include "include/rapidjson/stringbuffer.h"
+#include "vcuda_io.h"
 
-
+#include <iostream>
 #include <unordered_map>
 #include <cstdlib>
 #include <unistd.h>
@@ -43,8 +44,7 @@ struct vcuda_var {
 
 class vcuda_client {
     Document cuda_document;
-    std :: string host;
-    int port;
+    vcuda_io io;
     std :: unordered_map<label_t, vcuda_var> inputs;
     std :: unordered_map<label_t, std :: string> kernels;
     std :: string print_document();
