@@ -1,4 +1,5 @@
 #include "vcuda_io.h"
+// #include <iostream>
 
 vcuda_io :: vcuda_io() {
     connected = false;
@@ -55,6 +56,23 @@ int vcuda_io :: send(std :: string str) {
     return n;
 }
 
+std :: string vcuda_io :: recv() {
+    int n, size = 0;
+    std :: string recv_data;
+    char buffer[BUFFER_SIZE];
+    bzero(buffer, BUFFER_SIZE);
+    n = read(sockfd, buffer, 5);
+    size = vcstoi(buffer, n);
+    while(BUFFER_SIZE < size) {
+        n = read(sockfd, buffer, BUFFER_SIZE);
+        recv_data.append(buffer, n);
+        size = size - BUFFER_SIZE;
+    }
+    n = read(sockfd, buffer, size);
+    recv_data.append(buffer, n);
+    return recv_data;
+}
+
 std :: string vcuda_io :: read_kernel(std :: string filename) {
     std :: ifstream in (filename.c_str(), std :: ios :: in | std :: ios :: binary);
     std :: string code;
@@ -76,3 +94,11 @@ void vcuda_io :: disconnect() {
         connected = false;
     }
 }
+
+int vcstoi(char buffer[], int size) {
+    int n = 0;
+    for(int i = 0; i < size; ++i) {
+        n = n * 10 + (buffer[i] - '0');
+    }
+    return n;
+} 

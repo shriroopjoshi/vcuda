@@ -20,8 +20,11 @@ public:
     void init(std :: string, int);
     int connect_server();
     int send(std :: string);
+    std :: string recv();
     std :: string read_kernel(std :: string);
     void disconnect();
 };
+
+int vcstoi(char *, int);
 
 #endif

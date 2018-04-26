@@ -68,8 +68,15 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     kernels.insert(p);
     err_exit(io.connect_server());
     io.send(print_document(kdoc));
-    // io.send(b.GetString());
     delete[] kr_str;
+    std :: string recv_data = io.recv();
+    Document resp;
+    resp.Parse(recv_data.c_str());
+    std :: cout << resp["output"].GetString() << std :: endl;
+    std :: cerr << resp["error"].GetString() << std :: endl;
+    if(resp["stop"].GetBool()) {
+        exit(1);
+    }
     return label;
 }
 

@@ -13,5 +13,6 @@ int main() {
     client.vcudaMemcpy(c2, ptr, 5, vcudaMemcpyDeviceToHost);
     label_t k1 = client.add_kernel("example.kr", "example");
     client.execute_kernel(k1);
+    std :: cout << "graceful ending!" << std :: endl;
     return 0;
 }
