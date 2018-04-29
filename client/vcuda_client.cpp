@@ -4,8 +4,12 @@ using namespace rapidjson;
 
 vcuda_client :: vcuda_client(std :: string host, int port) {
     io.init(host, port);
-    const char *init_str = "{\"vars\": []}";
+    const char *init_str = "{\"vars\": [], \"kernels\": []}";
     cuda_document.Parse(init_str);
+}
+
+vcuda_client :: ~vcuda_client() {
+    io.disconnect();
 }
 
 label_t vcuda_client :: vcudaMalloc(int n, vcuda_type type) {
@@ -46,6 +50,10 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     label_t label = (label_t) kernels.size() + 1;
     std :: string kernel_str;
     kernel_str = io.read_kernel(path);
+    if(kernel_str == "err") {
+        std :: cerr << name << " - Kernel file not found!" << std :: endl;
+        exit(1);
+    }
     char *kr_str = new char[kernel_str.length() + 1];
     strcpy(kr_str, kernel_str.c_str());
     Document kdoc;
@@ -60,11 +68,9 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     name_value.SetString(nameb, name.length(), allocator);
     Value v (kObjectType);
     v.AddMember("name", name_value, allocator);
-    v.AddMember("blocks", 1, allocator);
-    v.AddMember("threads", 1, allocator);
     v.AddMember("code", kernel_val, allocator);
     kdoc.AddMember("kernel", v, allocator);
-    std :: pair <label_t, std :: string> p (label, path);
+    std :: pair <label_t, std :: string> p (label, name);
     kernels.insert(p);
     err_exit(io.connect_server());
     io.send(print_document(kdoc));
@@ -72,25 +78,54 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     std :: string recv_data = io.recv();
     Document resp;
     resp.Parse(recv_data.c_str());
-    std :: cout << resp["output"].GetString() << std :: endl;
-    std :: cerr << resp["error"].GetString() << std :: endl;
+    if(strlen(resp["output"].GetString()) > 0) {
+        std :: cout << "output: " <<  resp["output"].GetString();
+    }
+    if(strlen(resp["error"].GetString()) > 0) {
+        std :: cerr << "error: " <<  resp["error"].GetString();
+    }
     if(resp["stop"].GetBool()) {
         exit(1);
     }
     return label;
 }
 
-void vcuda_client :: execute_kernel(label_t kernel_label) {
+void vcuda_client :: execute_kernel(label_t kernel_label, vcuda_dim3 blocks, vcuda_dim3 threads) {
     err_exit(io.connect_server());
     // io.send(print_document(cuda_document));
-    io.disconnect();
+    Document::AllocatorType& allocator = cuda_document.GetAllocator();
+    Value& kr = cuda_document["kernels"];
+    Value v (kObjectType);
+    Value bdim (kArrayType);
+    Value tdim (kArrayType);
+    bdim.PushBack(blocks.x, allocator).PushBack(blocks.y, allocator).PushBack(blocks.z, allocator);
+    tdim.PushBack(threads.x, allocator).PushBack(threads.y, allocator).PushBack(threads.z,allocator);
+    v.AddMember("blocks", bdim, allocator);
+    v.AddMember("threads", tdim, allocator);
+    std :: unordered_map<label_t, std :: string> :: iterator it = kernels.find(kernel_label);
+    if(it == kernels.end()) {
+        std :: cerr << "No such kernel.\nAre you sure kernel_label is correct?" << std :: endl;
+        exit(1);
+    } else {
+        std :: string s = it -> second;
+        char nameb[s.size() + 1];
+        strcpy(nameb, s.c_str());
+        Value name_value;
+        name_value.SetString(nameb, s.length(), allocator);
+        v.AddMember("name", name_value, allocator);
+    }
+    kr.PushBack(v, allocator);
+    std :: string doc;
+    doc = print_document(cuda_document);
+    std :: cout << doc << std :: endl;
+    io.send(print_document(cuda_document));
 }
 
 std :: string vcuda_client :: print_document(Document &d) {
     StringBuffer buffer;
     Writer<StringBuffer> writer(buffer);
     d.Accept(writer);
-    // std :: cout << buffer.GetString() << std :: endl;
+    std :: cout << buffer.GetString() << std :: endl;
     return buffer.GetString();
 }
 

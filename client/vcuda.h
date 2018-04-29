@@ -35,6 +35,24 @@ enum vcuda_memcpy {
 
 struct vcuda_dim3 {
     int x, y, z;
+
+    vcuda_dim3(int x) {
+        this -> x = x;
+        y = 1;
+        z = 1;
+    }
+
+    vcuda_dim3(int x, int y) {
+        this -> x = x;
+        this -> y = y;
+        z = 1;
+    }
+
+    vcuda_dim3(int x, int y, int z) {
+        this -> x = x;
+        this -> y = y;
+        this -> z = z;
+    }
 };
 
 struct vcuda_var {
@@ -51,11 +69,12 @@ class vcuda_client {
     void err_exit(int);
 public:
     vcuda_client(std :: string, int);
+    ~vcuda_client();
     label_t add_kernel(std :: string, std :: string);
     void set_kernel_parameters(label_t, vcuda_dim3, vcuda_dim3);
     label_t vcudaMalloc(int, vcuda_type);
     void vcudaMemcpy(label_t, void *, int,  vcuda_memcpy);
-    void execute_kernel(label_t);
+    void execute_kernel(label_t, vcuda_dim3, vcuda_dim3);
 };
 
 #endif

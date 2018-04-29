@@ -12,7 +12,9 @@ int main() {
     float ptr[] = {2.5, 7.9, 6.3, 9.45, 8.2385};
     client.vcudaMemcpy(c2, ptr, 5, vcudaMemcpyDeviceToHost);
     label_t k1 = client.add_kernel("example.kr", "example");
-    client.execute_kernel(k1);
+    vcuda_dim3 b (1);
+    vcuda_dim3 t (10);
+    client.execute_kernel(k1, b, t);
     std :: cout << "graceful ending!" << std :: endl;
     return 0;
 }
