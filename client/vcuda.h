@@ -56,6 +56,7 @@ struct vcuda_dim3 {
 };
 
 struct vcuda_var {
+    label_t label;
     int size;
     vcuda_type type;
 };
@@ -74,7 +75,7 @@ public:
     void set_kernel_parameters(label_t, vcuda_dim3, vcuda_dim3);
     label_t vcudaMalloc(int, vcuda_type);
     void vcudaMemcpy(label_t, void *, int,  vcuda_memcpy);
-    void execute_kernel(label_t, vcuda_dim3, vcuda_dim3);
+    void execute_kernel(label_t, vcuda_dim3, vcuda_dim3, label_t *, int);
 };
 
 #endif

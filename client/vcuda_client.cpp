@@ -15,6 +15,7 @@ vcuda_client :: ~vcuda_client() {
 label_t vcuda_client :: vcudaMalloc(int n, vcuda_type type) {
     label_t label = (label_t) inputs.size() + 1;
     vcuda_var variable;
+    variable.label = label;
     variable.size = n;
     variable.type = type;
     std :: pair<label_t, vcuda_var> p(label, variable);
@@ -27,6 +28,7 @@ void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memc
     Document :: AllocatorType& allocator = cuda_document.GetAllocator();
     Value& doc_vars = cuda_document["vars"];
     Value v(kObjectType);
+    v.AddMember("label", variable.label, allocator);
     v.AddMember("size", variable.size, allocator);
     if(variable.type == VC_INT) {
         v.AddMember("type", "VC_INT", allocator);
@@ -90,7 +92,7 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     return label;
 }
 
-void vcuda_client :: execute_kernel(label_t kernel_label, vcuda_dim3 blocks, vcuda_dim3 threads) {
+void vcuda_client :: execute_kernel(label_t kernel_label, vcuda_dim3 blocks, vcuda_dim3 threads, label_t params[], int n) {
     err_exit(io.connect_server());
     // io.send(print_document(cuda_document));
     Document::AllocatorType& allocator = cuda_document.GetAllocator();
@@ -114,11 +116,15 @@ void vcuda_client :: execute_kernel(label_t kernel_label, vcuda_dim3 blocks, vcu
         name_value.SetString(nameb, s.length(), allocator);
         v.AddMember("name", name_value, allocator);
     }
+    Value ins (kArrayType);
+    for(int i = 0; i < n; ++i) {
+        ins.PushBack(params[i], allocator);
+    }
+    v.AddMember("params", ins, allocator);
     kr.PushBack(v, allocator);
-    std :: string doc;
-    doc = print_document(cuda_document);
-    std :: cout << doc << std :: endl;
     io.send(print_document(cuda_document));
+    std :: cout << io.recv() << std :: endl;
+    std :: cout << io.recv() << std :: endl;
 }
 
 std :: string vcuda_client :: print_document(Document &d) {

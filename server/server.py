@@ -37,21 +37,26 @@ def sendall(sock, data):
 def writeprogramfile(filename, data, kernelfile):
     headers = ['#include "../vcuda_header.h"\n', '#include "' + kernelfile + '"\n',
     'using namespace std;\n', 'int main() {\n']
-    dvars = 0
-    hvars = 0
+    #dvars = 0
+    #hvars = 0
     vars = data["vars"]
     kernels = data["kernels"]
     with open(filename, "w") as sourcefile:
         sourcefile.writelines(headers)
+        counter = {}
+        c = 0
+        for v in vars:
+            counter[str(v)] = c
+            c += 1
         # allocate host memory
         for v in vars:
             firsttime = True
             if v["type"] == "VC_INT":
                 #something
-                sourcefile.write('int h' + str(hvars) + '[] = {')
+                sourcefile.write('int h' + str(counter[str(v)]) + '[] = {')
             elif v["type"] == "VC_FLOAT":
                 #something
-                sourcefile.write('float h' + str(hvars) + '[] = {')
+                sourcefile.write('float h' + str(counter[str(v)]) + '[] = {')
             for i in v["data"]:
                 if firsttime:
                     sourcefile.write(str(i))
@@ -59,18 +64,16 @@ def writeprogramfile(filename, data, kernelfile):
                 else:
                     sourcefile.write(',' + str(i))
             sourcefile.write('};\n')
-            hvars += 1
         # allocate device memory and initialize it
         for v in vars:
             if v["type"] == "VC_INT":
-                sourcefile.write('int *d' + str(dvars) + ';\n')
-                sourcefile.write('cudaMalloc((void**)d' + str(dvars) + ',' + str(v["size"])  + '*sizeof(int));\n')
-                sourcefile.write('cudaMemcpy(d' + str(dvars) + ',&h' + str(dvars) + ', ' + str(v["size"]) + '*sizeof(int), cudaMemcpyHostToDevice);\n')
+                sourcefile.write('int *d' + str(counter[str(v)]) + ';\n')
+                sourcefile.write('cudaMalloc((void**)&d' + str(counter[str(v)]) + ',' + str(v["size"])  + '*sizeof(int));\n')
+                sourcefile.write('cudaMemcpy(d' + str(counter[str(v)]) + ',h' + str(counter[str(v)]) + ', ' + str(v["size"]) + '*sizeof(int), cudaMemcpyHostToDevice);\n')
             elif v["type"] == "VC_FLOAT":
-                sourcefile.write('float *d' + str(dvars) + ';\n')
-                sourcefile.write('cudaMalloc((void**)d' + str(dvars) + ',' + str(v["size"])  + '*sizeof(float));\n')
-                sourcefile.write('cudaMemcpy(d' + str(dvars) + ',&h' + str(dvars) + ', ' + str(v["size"]) + '*sizeof(float), cudaMemcpyHostToDevice);\n')
-            dvars += 1
+                sourcefile.write('float *d' + str(counter[str(v)]) + ';\n')
+                sourcefile.write('cudaMalloc((void**)&d' + str(counter[str(v)]) + ',' + str(v["size"])  + '*sizeof(float));\n')
+                sourcefile.write('cudaMemcpy(d' + str(counter[str(v)]) + ',h' + str(counter[str(v)]) + ', ' + str(v["size"]) + '*sizeof(float), cudaMemcpyHostToDevice);\n')
         kvars = 0
         for kernel in kernels:
             # allocate kernel blocks and threads
@@ -89,12 +92,35 @@ def writeprogramfile(filename, data, kernelfile):
             else:
                 sourcefile.write('dim3 t' + str(kvars) + ' (' + str(kernel["threads"][0]) + ',' + str(kernel["threads"][1]) + ',' + str(kernel["threads"][2]) + ');\n')
             kvars += 1
-            sourcefile.write(kernel["name"].split('.')[0] + '<<<b,t>>>();\n')
-        dvars = 0
+            sourcefile.write(kernel["name"].split('.')[0] + '<<<b0,t0>>>(')
+            index = 1
+            firsttime = True
+            #3
+            # while index != (len(vars) + 1):
+            for v in vars:
+                # if v["label"] == index:
+                #     index += 1
+                if firsttime:
+                    sourcefile.write('d' + str(counter[str(v)]))
+                    firsttime = False
+                else:
+                    sourcefile.write(',d' + str(counter[str(v)]))
+                    #break
+                # test
+            sourcefile.write(');\n')
+        for v in vars:
+            if v["type"] == "VC_INT":
+                sourcefile.write('cudaMemcpy(h' + str(counter[str(v)]) + ',d' + str(counter[str(v)]) + ', ' + str(v["size"]) + '*sizeof(int), cudaMemcpyDeviceToHost);\n')
+            elif v["type"] == "VC_FLOAT":
+                sourcefile.write('cudaMemcpy(h' + str(counter[str(v)]) + ',h' + str(counter[str(v)]) + ', ' + str(v["size"]) + '*sizeof(float), cudaMemcpyDeviceToHost);\n')
+        for v in vars:
+            sourcefile.write('bool first' + str(counter[str(v)]) + '=true;\n')
+            sourcefile.write('for(int i=0;i<' + str(v["size"]) + ';i++){\n')
+            sourcefile.write('if(first' + str(counter[str(v)]) + '){first' + str(counter[str(v)]) + '=false;cout<<h' + str(counter[str(v)]) + '[i];}\n')
+            sourcefile.write('else{cout<<","<<h' + str(counter[str(v)]) + '[i];}\n}\ncout<<endl;\n')
         # free memory
         for v in vars:
-            sourcefile.write('cudaFree(d' + str(dvars) + ');\n')
-            dvars += 1
+            sourcefile.write('cudaFree(d' + str(counter[str(v)]) + ');\n')
         # end file
         sourcefile.write('return 0;\n}')
 
@@ -128,7 +154,8 @@ def clientthread(socket, address, id):
         else:
             resp["stop"] = False
         sendall(socket, json.dumps(resp))
-    print 
+        if "error" in err:
+            return
     print "recieving"
     data = recvall(socket)
     print "done"
@@ -137,8 +164,46 @@ def clientthread(socket, address, id):
     # if(jsdata.has_key("vars")):
     filename = str(id) + "/client.cpp"
     writeprogramfile(filename, jsdata, kernelfile)
+    p = subprocess.Popen(["nvcc", "-x", "cu", filename, "-o", str(id) + "/main"],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (out, err) = p.communicate(None)
+    print "OUTPUT: " + out
+    print "ERROR: " + err
+    resp = {}
+    resp["output"] = out
+    if err != "":
+        resp["error"] = err
+    else:
+        resp["error"] = "none\n"
+    if "error" in err:
+        resp["stop"] = True
+    else:
+        resp["stop"] = False
+    sendall(socket, json.dumps(resp))
+    if "error" in err:
+        sendall(socket, "exit")
+        return
+    p = subprocess.Popen([str(id) + "/main.exe"],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (out, err) = p.communicate(None)
+    print "EXE_OUT: " + out
+    print "EXE_ERR: " + err
+    outs = out.split('\n')
+    i = 0
+    for v in jsdata["vars"]:
+        if i < len(jsdata["vars"]):
+            resstring = outs[i].split(',')
+            reslist = []
+            if v["type"] == "VC_INT":
+                for res in resstring:
+                    reslist.append(int(res))
+            elif v["type"] == "VC_FLOAT":
+                for res in resstring:
+                    reslist.append(float(res))
+            v["data"] = reslist
+            i += 1
+    jsdata["errors"] = err
+    sendall(socket, json.dumps(jsdata))
+    
         
-
 
 def start():
     serversocket = socket(AF_INET, SOCK_STREAM)
