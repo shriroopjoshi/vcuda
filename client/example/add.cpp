@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ctime>
 #include "vcuda.h"
 
 #define N 64
@@ -16,6 +17,7 @@ int main() {
         c[i] = 1;
     }
     int n = N;
+    clock_t t = clock();
     vcuda_client client ("localhost", 9000);
     labels[0] = client.vcudaMalloc(1, VC_INT);
     labels[1] = client.vcudaMalloc(N, VC_INT);
@@ -29,5 +31,8 @@ int main() {
     vcuda_dim3 bl (1);
     vcuda_dim3 th (N);
     client.execute_kernel(kr, bl, th, labels, 3);
+    t = clock() - t;
+    cout << "clicks: " << t << "; time: " << ((float) t / CLOCKS_PER_SEC) << "sec";
+    cout << endl;    
     return 0;
 }

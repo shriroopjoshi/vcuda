@@ -67,6 +67,8 @@ class vcuda_client {
     std :: unordered_map<label_t, vcuda_var> inputs;
     std :: unordered_map<label_t, std :: string> kernels;
     std :: string print_document(Document &);
+    void vcudaMemcpyToDevice(label_t, void *, int);
+    void vcudaMemcpyToHost(label_t, void *, int);
     void err_exit(int);
 public:
     vcuda_client(std :: string, int);

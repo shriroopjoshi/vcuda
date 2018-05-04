@@ -37,8 +37,6 @@ def sendall(sock, data):
 def writeprogramfile(filename, data, kernelfile):
     headers = ['#include "../vcuda_header.h"\n', '#include "' + kernelfile + '"\n',
     'using namespace std;\n', 'int main() {\n']
-    #dvars = 0
-    #hvars = 0
     vars = data["vars"]
     kernels = data["kernels"]
     with open(filename, "w") as sourcefile:
@@ -52,10 +50,8 @@ def writeprogramfile(filename, data, kernelfile):
         for v in vars:
             firsttime = True
             if v["type"] == "VC_INT":
-                #something
                 sourcefile.write('int h' + str(counter[str(v)]) + '[] = {')
             elif v["type"] == "VC_FLOAT":
-                #something
                 sourcefile.write('float h' + str(counter[str(v)]) + '[] = {')
             for i in v["data"]:
                 if firsttime:
@@ -80,14 +76,12 @@ def writeprogramfile(filename, data, kernelfile):
             if len(kernel["blocks"]) == 1:
                 sourcefile.write('dim3 b' + str(kvars) + ' (' + str(kernel["blocks"][0]) + ');\n')
             elif len(kernel["blocks"]) == 2:
-                # something
                 sourcefile.write('dim3 b' + str(kvars) + ' (' + str(kernel["blocks"][0]) + ',' + str(kernel["blocks"][1]) + ');\n')
             else:
                 sourcefile.write('dim3 b' + str(kvars) + ' (' + str(kernel["blocks"][0]) + ',' + str(kernel["blocks"][1]) + ',' + str(kernel["blocks"][2]) + ');\n')
             if len(kernel["threads"]) == 1:
                 sourcefile.write('dim3 t' + str(kvars) + ' (' + str(kernel["threads"][0]) + ');\n')
             elif len(kernel["blocks"]) == 2:
-                # something
                 sourcefile.write('dim3 t' + str(kvars) + ' (' + str(kernel["threads"][0]) + ',' + str(kernel["threads"][1]) + ');\n')
             else:
                 sourcefile.write('dim3 t' + str(kvars) + ' (' + str(kernel["threads"][0]) + ',' + str(kernel["threads"][1]) + ',' + str(kernel["threads"][2]) + ');\n')
@@ -95,18 +89,12 @@ def writeprogramfile(filename, data, kernelfile):
             sourcefile.write(kernel["name"].split('.')[0] + '<<<b0,t0>>>(')
             index = 1
             firsttime = True
-            #3
-            # while index != (len(vars) + 1):
             for v in vars:
-                # if v["label"] == index:
-                #     index += 1
                 if firsttime:
                     sourcefile.write('d' + str(counter[str(v)]))
                     firsttime = False
                 else:
                     sourcefile.write(',d' + str(counter[str(v)]))
-                    #break
-                # test
             sourcefile.write(');\n')
         for v in vars:
             if v["type"] == "VC_INT":
@@ -161,7 +149,6 @@ def clientthread(socket, address, id):
     print "done"
     print "data: \"" + data + "\""
     jsdata = json.loads(data.encode("utf-8").strip())
-    # if(jsdata.has_key("vars")):
     filename = str(id) + "/client.cpp"
     writeprogramfile(filename, jsdata, kernelfile)
     p = subprocess.Popen(["nvcc", "-x", "cu", filename, "-o", str(id) + "/main"],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -180,7 +167,10 @@ def clientthread(socket, address, id):
         resp["stop"] = False
     sendall(socket, json.dumps(resp))
     if "error" in err:
-        sendall(socket, "exit")
+        # For next io.recv() call, send somthing.
+        # This way client will not crash
+        jsexit = {"exit": True}
+        sendall(socket, json.dumps(jsexit))
         return
     p = subprocess.Popen([str(id) + "/main.exe"],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (out, err) = p.communicate(None)
@@ -215,13 +205,13 @@ def start():
         sys.exit()
     serversocket.listen(5)
     try:
-        # while True:
-        #     (clientsocket, address) = serversocket.accept()
-        #     id = uuid.uuid4()
-        #     start_new_thread(clientthread, (clientsocket, address, id, ))
-        (clientsocket, address) = serversocket.accept()
-        id = uuid.uuid4()
-        clientthread(clientsocket, address, id)
+        while True:
+            (clientsocket, address) = serversocket.accept()
+            id = uuid.uuid4()
+            start_new_thread(clientthread, (clientsocket, address, id, ))
+        # (clientsocket, address) = serversocket.accept()
+        # id = uuid.uuid4()
+        # clientthread(clientsocket, address, id)
     except KeyboardInterrupt:
         print "interrupted! Ctrl+C"
         serversocket.close()

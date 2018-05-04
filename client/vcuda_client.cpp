@@ -23,7 +23,7 @@ label_t vcuda_client :: vcudaMalloc(int n, vcuda_type type) {
     return label;
 }
 
-void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memcpy kind) {
+void vcuda_client :: vcudaMemcpyToDevice(label_t label, void *ptr, int count) {
     vcuda_var variable = inputs[label];
     Document :: AllocatorType& allocator = cuda_document.GetAllocator();
     Value& doc_vars = cuda_document["vars"];
@@ -46,6 +46,41 @@ void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memc
         v.AddMember("data", a, allocator);
     }
     doc_vars.PushBack(v, allocator);
+}
+
+void vcuda_client :: vcudaMemcpyToHost(label_t label, void *ptr, int count) {
+    if(cuda_document.HasMember("vars")) {
+        print_document(cuda_document);
+        Value& v = cuda_document["vars"];
+        for(Value :: ConstValueIterator vitr = v.Begin(); vitr != v.End(); ++vitr) {
+            int temp = vitr -> GetObject()["label"].GetInt();
+            if(label == temp) {
+                int i = 0;
+                std :: string type = vitr -> GetObject()["type"].GetString();
+                if (!std :: strcmp(type.c_str(), "VC_INT")) {
+                    for(Value :: ConstValueIterator itr = vitr -> GetObject()["data"].Begin(); itr != vitr -> GetObject()["data"].End(); ++itr) {
+                        ((int *) ptr)[i++] = itr -> GetInt();
+                    }
+                    std :: cout << std :: endl;
+                } else if (!std :: strcmp(type.c_str(), "VC_FLOAT")) {
+                    for(Value :: ConstValueIterator itr = vitr -> GetObject()["data"].Begin(); itr != vitr -> GetObject()["data"].End(); ++itr) {
+                        ((float *) ptr)[i++] = itr -> GetInt();
+                    }
+                }
+                return;
+            }
+        }
+    } else {
+        std :: cerr << "cannot find data" << std :: endl;
+    }
+}
+
+void vcuda_client :: vcudaMemcpy(label_t label, void *ptr, int count, vcuda_memcpy kind) {
+    if(kind == vcudaMemcpyHostToDevice) {
+        vcudaMemcpyToDevice(label, ptr, count);
+    } else if (kind == vcudaMemcpyDeviceToHost) {
+        vcudaMemcpyToHost(label, ptr, count);
+    }
 }
 
 label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
@@ -75,6 +110,7 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
     std :: pair <label_t, std :: string> p (label, name);
     kernels.insert(p);
     err_exit(io.connect_server());
+    std :: cout << "sending kernel to compile" << std :: endl;
     io.send(print_document(kdoc));
     delete[] kr_str;
     std :: string recv_data = io.recv();
@@ -94,7 +130,6 @@ label_t vcuda_client :: add_kernel(std :: string path, std :: string name) {
 
 void vcuda_client :: execute_kernel(label_t kernel_label, vcuda_dim3 blocks, vcuda_dim3 threads, label_t params[], int n) {
     err_exit(io.connect_server());
-    // io.send(print_document(cuda_document));
     Document::AllocatorType& allocator = cuda_document.GetAllocator();
     Value& kr = cuda_document["kernels"];
     Value v (kObjectType);
@@ -122,16 +157,36 @@ void vcuda_client :: execute_kernel(label_t kernel_label, vcuda_dim3 blocks, vcu
     }
     v.AddMember("params", ins, allocator);
     kr.PushBack(v, allocator);
+    std :: cout << "sending data" << std :: endl;
     io.send(print_document(cuda_document));
-    std :: cout << io.recv() << std :: endl;
-    std :: cout << io.recv() << std :: endl;
+    std :: string recv_data = io.recv();
+    Document resp;
+    resp.Parse(recv_data.c_str());
+    if(strlen(resp["output"].GetString()) > 0) {
+        std :: cout << "output: " <<  resp["output"].GetString();
+    }
+    if(strlen(resp["error"].GetString()) > 0) {
+        std :: cerr << "error: " <<  resp["error"].GetString();
+    }
+    if(resp["stop"].GetBool()) {
+        exit(1);
+    }
+    std :: cout << "executing kernel with data" << std :: endl;
+    std :: string str = io.recv();
+    // std :: cout << str << std :: endl;
+    cuda_document.Parse(str.c_str());
+    Value::ConstMemberIterator itr = cuda_document.FindMember("exit");
+    if(itr != cuda_document.MemberEnd()) {
+        std :: cerr << "API error" << std :: endl;
+        exit(1);
+    }
 }
 
 std :: string vcuda_client :: print_document(Document &d) {
     StringBuffer buffer;
     Writer<StringBuffer> writer(buffer);
     d.Accept(writer);
-    std :: cout << buffer.GetString() << std :: endl;
+    // std :: cout << buffer.GetString() << std :: endl;
     return buffer.GetString();
 }
 
